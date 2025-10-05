@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Implicit Comparison Test (Google Sheets)</title>
+  <style>
+    :root{
+      --bg:#0b1020; --fg:#eef2ff; --muted:#94a3b8; --accent:#60a5fa; --error:#ef4444; --ok:#22c55e; --card:#121833; --bar:#1f2a4a; --barfill:#64748b;
+    }
+    html,body{height:100%;}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background:var(--bg); color:var(--fg);}
+    .app{max-width:760px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;}
+    header{padding:14px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center;background:transparent;}
+    .pill{background:var(--card);border:1px solid #1f2937;padding:8px 12px;border-radius:999px;font-size:14px;color:var(--muted);}
+    .screen{flex:1;display:flex;flex-direction:column;gap:16px;padding:16px;}
+    .labels{display:flex;justify-content:space-between;align-items:center;}
+    .label{background:var(--card);border:1px solid #1f2937;width:49%;border-radius:16px;padding:12px 14px;min-height:56px;display:flex;flex-direction:column;justify-content:center}
+    .label .title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .label .value{font-weight:700;font-size:16px}
+    .stimulus-wrap{position:relative;flex:1;display:flex;align-items:center;justify-content:center}
+    .stimulus{font-size:40px;font-weight:800;letter-spacing:.02em;text-align:center}
+    .errx{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:72px;color:white}
+    .errx.show{display:flex;animation:pop .25s ease}
+    .errx .x{background:rgba(239,68,68,.9);padding:4px 18px;border-radius:16px}
+    @keyframes pop{from{transform:scale(.9);opacity:.6}to{transform:scale(1);opacity:1}}
+    .progress{height:10px;background:var(--bar);border-radius:999px;overflow:hidden;border:1px solid #1f2937}
+    .progress .fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),#7c3aed);transition:width .25s ease}
+    .zones{position:fixed;inset:0;display:none;z-index:10; touch-action:none;}
+    .zones.active{display:flex}
+    .zone{flex:1;background:transparent;border:0;appearance:none}
+    .btn{background:var(--accent);color:#0b1020;border:0;padding:12px 16px;border-radius:14px;font-weight:700;cursor:pointer}
+    .btn:disabled{background:var(--bar); color:var(--muted); cursor:not-allowed;}
+    .btn.secondary{background:#1f2a4a;color:var(--fg);border:1px solid #374151}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:18px;padding:16px}
+    .gauge{position:relative;height:18px;border-radius:999px;background:linear-gradient(90deg,#ef4444, #c084fc 50%, #22c55e);}
+    .gauge .zero{position:absolute;left:50%;top:-8px;transform:translateX(-50%);font-size:12px;color:var(--muted)}
+    .gauge .marker{position:absolute;top:-6px;width:2px;height:30px;background:#fff;border-radius:2px;transform:translateX(-50%)}
+    .gauge .mean{position:absolute;top:-6px;width:2px;height:30px;background:#fde047;transform:translateX(-50%)}
+    .transition-slide {position: absolute;inset: 0;display: none;align-items: center;justify-content: center;background: rgba(11, 16, 32, 0.85);z-index: 20;padding: 16px;text-align: center;}
+    dialog{background:var(--card);color:var(--fg);border:1px solid #1f2937;border-radius:18px;max-width:560px;width:90%}
+    dialog::backdrop{background:rgba(0,0,0,.55)}
+    @media (max-width:420px){.stimulus{font-size:32px}}
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header>
+      <div class="pill" id="phasePill">Ready</div>
+      <div class="pill" id="trialPill">0 / 0</div>
+    </header>
+    <main class="screen">
+      <div class="labels"><div class="label" id="leftLabel"><div class="title">Left</div><div class="value">—</div></div><div class="label" id="rightLabel"><div class="title">Right</div><div class="value">—</div></div></div>
+      <div class="stimulus-wrap"><div class="stimulus" id="stimulus">Tap Start</div><div class="errx" id="errx"><div class="x">❌</div></div></div>
+      <div class="progress"><div class="fill" id="progressFill"></div></div>
+      <div class="card" id="ctaCard">
+        <h3 style="margin:0 0 8px 0">Implicit Comparison Test (Gender & Occupations)</h3>
+        <p style="margin:0 0 12px 0;color:var(--muted)">In this test, you will see words that represent career, family, MALE, and FEMALE. Respond by tapping, swiping, or using the Left/Right Arrow keys. Speed is important.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="startBtn">Start Test</button>
+          <button class="btn secondary" id="demoBtn">How to Play</button>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div class="transition-slide" id="transitionSlide"><div class="card"><h3 id="transitionTitle" style="margin-top:0;"></h3><p id="transitionText" style="color:var(--muted);line-height:1.6;"></p><div style="text-align:center;margin-top:20px;"><button class="btn" id="transitionContinueBtn">Continue</button></div></div></div>
+  <div class="zones" id="zones"><button class="zone" id="zoneLeft" aria-label="Left response area" title="Left"></button><button class="zone" id="zoneRight" aria-label="Right response area" title="Right"></button></div>
+  <dialog id="demoModal"><form method="dialog" style="margin:0"><div class="card" style="border:none"><h3 style="margin:0 0 8px 0">How to respond</h3><ol style="color:var(--muted);padding-left:18px;line-height:1.6"><li>Read the labels at the top (Left vs. Right).</li><li>When a word appears, tap or swipe the side it belongs to (or use the Left/Right Arrow keys).</li><li>If you make a mistake, a red ❌ appears. Quickly make the correct response to continue.</li><li>Go as fast as you can!</li></ol><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px"><button class="btn">Got it</button></div></div></form></dialog>
+  <dialog id="demographicsModal"><form method="dialog" id="demographicsForm" style="margin:0"><div class="card" style="border:none"><h3 style="margin:0 0 8px 0">A Couple of Questions</h3><p style="color:var(--muted);margin:0 0 16px 0;line-height:1.6">Your anonymous responses help researchers understand the results better. This is optional.</p><div style="display:flex;flex-direction:column;gap:12px;"><div><label for="genderSelect" style="display:block;margin-bottom:4px;color:var(--muted);font-size:14px;">Gender</label><select id="genderSelect" class="btn secondary" style="width:100%;text-align:left;"><option value="prefer_not_to_say">Prefer not to say</option><option value="male">Male</option><option value="female">Female</option><option value="non_binary">Non-binary</option><option value="other">Other</option></select></div><div><label for="ageInput" style="display:block;margin-bottom:4px;color:var(--muted);font-size:14px;">Age</label><input type="number" id="ageInput" placeholder="e.g., 25" class="btn secondary" style="width:100%;text-align:left;"></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px"><button type="submit" class="btn">Start the Test</button></div></div></form></dialog>
+  <dialog id="resultModal"><form method="dialog" style="margin:0"><div class="card" style="border:none"><h3 style="margin:0 0 6px 0">Your Result</h3><div id="resultSummary" style="margin:8px 0 12px 0;color:var(--muted)"></div><div class="gauge" id="gauge" aria-label="D-Score gauge" style="margin:10px 0 18px 0"><div class="zero">0</div><div class="marker" id="userMarker" style="left:50%"></div><div class="mean" id="meanMarker" style="left:50%"></div></div><div id="saveStatus" style="font-size:12px; color:var(--muted); text-align:center; margin-bottom:12px; min-height: 1em;"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="downloadBtn" type="button">Download Raw Data</button><button class="btn secondary">Close</button></div></div></form></dialog>
+  <script>
+    // --- Google Sheets Configuration ---
+    // This is the URL of the Google Apps Script you will deploy.
+    // See setup-instructions.md for how to get this URL.
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxW1x62P8oe0IO80E9n8ZGnIwLfbMBfkEtjHl-3oQWH8irGn8jStaEAK4-xb2N4iDZX/exec';
+  
+    // Main application code
+    const CONFIG = {
+      version: '2.0-google-sheets',
+      language: 'en',
+      categories: { attribute: { left: 'Career', right: 'Family' }, concept: { left: 'MALE', right: 'FEMALE' } },
+      stimuli: { career: ['office', 'manager', 'salary', 'job', 'briefcase', 'profession', 'employees'], family: ['garden', 'kitchen', 'marriage', 'laundry', 'home', 'children', 'relatives'], male: ['MAN', 'HE', 'HIM', 'BOY', 'HIS', 'GENT'], female: ['WOMAN', 'SHE', 'WOMEN', 'HER', 'GIRL', 'HERS', 'LADY'] },
+      blocks: [ { id: 'B-01', type: 'attribute', trials: 2 }, { id: 'B-02', type: 'concept', trials: 2 }, { id: 'B-03', type: 'combined-compatible', trials: 2 }, { id: 'B-04', type: 'combined-compatible', trials: 4 }, { id: 'B-05', type: 'reversed-concept', trials: 2 }, { id: 'B-06', type: 'combined-incompatible', trials: 2 }, { id: 'B-07', type: 'combined-incompatible', trials: 4 } ],
+      benchmark: { mean: 0.31, sd: 0.12, n: 542 }
+    };
+    const TRANSITION_TEXTS = { 'B-01': { title: 'Part 1 of 5', text: '...Tap or swipe left...for <b>Career</b>.<br>...Tap or swipe right...for <b>Family</b>.' }, 'B-02': { title: 'Part 2 of 5', text: '...Tap or swipe left...for <b>MALE</b>.<br>...Tap or swipe right...for <b>FEMALE</b>.' }, 'B-03': { title: 'Part 3 of 5', text: '...Tap or swipe left...for <b>MALE / Career</b>.<br>...Tap or swipe right...for <b>FEMALE / Family</b>.' }, 'B-05': { title: 'Part 4 of 5', text: '<b>Watch out!</b>...<br><br>Tap or swipe left...for <b>FEMALE</b>.<br>Tap or swipe right...for <b>MALE</b>.' }, 'B-06': { title: 'Part 5 of 5', text: '...combined again.<br><br>Tap or swipe left...for <b>FEMALE / Career</b>.<br>Tap or swipe right...for <b>MALE / Family</b>.' } };
+    const state = { trials: [], blockIndex: 0, trialIndex: 0, currentStimulus: null, expectKey: null, leftMapping: {}, rightMapping: {}, blockQueue: [], startTime: 0, accepting: false, reversedConcept: false, benchmark: { ...CONFIG.benchmark }, demographics: { age: null, gender: null }, armed: false, inErrorState: false };
+    const el=id=>document.getElementById(id),phasePill=el("phasePill"),trialPill=el("trialPill"),leftLabel=el("leftLabel").querySelector(".value"),rightLabel=el("rightLabel").querySelector(".value"),stimulusEl=el("stimulus"),errx=el("errx"),progressFill=el("progressFill"),startBtn=el("startBtn"),demoBtn=el("demoBtn"),zones=el("zones"),demoModal=el("demoModal"),resultModal=el("resultModal"),resultSummary=el("resultSummary"),userMarker=el("userMarker"),meanMarker=el("meanMarker"),downloadBtn=el("downloadBtn"),ctaCard=el("ctaCard"),demographicsModal=el("demographicsModal"),demographicsForm=el("demographicsForm"),ageInput=el("ageInput"),genderSelect=el("genderSelect"),transitionSlide=el("transitionSlide"),transitionTitle=el("transitionTitle"),transitionText=el("transitionText"),transitionContinueBtn=el("transitionContinueBtn"),saveStatus=el("saveStatus");
+    demoBtn.addEventListener("click",(()=>demoModal.showModal())),startBtn.addEventListener("click",(()=>demographicsModal.showModal())),demographicsForm.addEventListener("submit",(e=>{e.preventDefault(),state.demographics.age=ageInput.value?parseInt(ageInput.value,10):null,state.demographics.gender=genderSelect.value,demographicsModal.close(),startTestSequence()}));
+    function debugMsg(t){console.log("[ICT]",t),phasePill.textContent=t}
+    function armZones(){if(state.armed)return;state.armed=!0,zones.classList.add("active");let t=0,e=0,n=0;const o=50,i=15,s=250,a=75;zones.addEventListener("pointerdown",(o=>{o.isPrimary&&(o.preventDefault(),t=o.clientX,e=o.clientY,n=performance.now())})),zones.addEventListener("pointerup",(a=>{if(!a.isPrimary||0===n)return;const l=performance.now()-n,r=a.clientX-t,c=a.clientY-e;n=0,Math.abs(r)>o&&Math.abs(c)<75?handleResponse(r>0?"right":"left"):Math.abs(r)<i&&Math.abs(c)<i&&l<s&&handleResponse(a.clientX<window.innerWidth/2?"left":"right")})),debugMsg("Armed")}
+    window.addEventListener("keydown",(e=>{!state.accepting&&!state.inErrorState||("ArrowLeft"===e.key||"a"===e.key.toLowerCase()?handleResponse("left"):"ArrowRight"===e.key||"l"===e.key.toLowerCase())&&handleResponse("right")}));
+    function shuffle(t){const e=[...t];for(let t=e.length-1;t>0;t--){const o=Math.floor(Math.random()*(t+1));[e[t],e[o]]=[e[o],e[t]]}return e}const now=()=>performance.now();
+    function showTransition(t,e){return new Promise((o=>{stimulusEl.style.visibility="hidden",transitionTitle.innerHTML=t,transitionText.innerHTML=e,transitionSlide.style.display="flex";const n=()=>{transitionSlide.style.display="none",stimulusEl.style.visibility="visible",transitionContinueBtn.removeEventListener("click",n),armZones(),o()};transitionContinueBtn.addEventListener("click",n)}))}
+    function showErrorX(){errx.classList.add("show"),setTimeout((()=>errx.classList.remove("show")),250)}
+    function updateProgress(){const t=CONFIG.blocks.reduce(((t,e)=>t+e.trials),0),e=state.blockQueue.slice(0,state.blockIndex).reduce(((t,e)=>t+e.trials),0)+state.trialIndex;progressFill.style.width=(100*e/t).toFixed(1)+"%",trialPill.textContent=`${e} / ${t}`}
+    function setStatus(t){phasePill.textContent=t}
+    async function startTestSequence(){try{ctaCard.style.display="none",stimulusEl.textContent="Get ready…",setStatus("Loading…"),state.blockQueue=CONFIG.blocks.map((t=>({...t}))),state.blockIndex=0,state.trialIndex=0,state.trials=[],state.reversedConcept=!1,debugMsg("Starting B-01"),await nextBlock()}catch(t){stimulusEl.textContent="Startup error: "+(t&&t.message?t.message:String(t)),setStatus("Error"),console.error(t)}}
+    function setLabels(t){const e=CONFIG.categories.attribute,o=CONFIG.categories.concept,n=state.reversedConcept?o.right:o.left,i=state.reversedConcept?o.left:o.right;"attribute"===t?(state.leftMapping={career:!0},state.rightMapping={family:!0},leftLabel.textContent=e.left,rightLabel.textContent=e.right):"concept"===t||"reversed-concept"===t?(state.leftMapping=state.reversedConcept?{female:!0}:{male:!0},state.rightMapping=state.reversedConcept?{male:!0}:{female:!0},leftLabel.textContent=n,rightLabel.textContent=i):"combined-compatible"===t?(state.leftMapping={male:!0,career:!0},state.rightMapping={female:!0,family:!0},leftLabel.textContent=`${o.left} / ${e.left}`,rightLabel.textContent=`${o.right} / ${e.right}`):"combined-incompatible"===t&&(state.leftMapping={female:!0,career:!0},state.rightMapping={male:!0,family:!0},leftLabel.textContent=`${n} / ${e.left}`,rightLabel.textContent=`${i} / ${e.right}`)}
+    async function nextBlock(){if(state.blockIndex>=state.blockQueue.length)return void finishTest();const t=state.blockQueue[state.blockIndex];if(TRANSITION_TEXTS[t.id]){state.accepting=!1;const{title:e,text:o}=TRANSITION_TEXTS[t.id];await showTransition(e,o)}"B-05"===t.id&&(state.reversedConcept=!0),setLabels(t.type),setStatus(`${t.id} • ${t.type.replace(/-/g," ")}`);let e=[];"attribute"===t.type?e=[...CONFIG.stimuli.career.map((t=>({t:t,c:"career"}))),...CONFIG.stimuli.family.map((t=>({t:t,c:"family"})))]:"concept"===t.type||"reversed-concept"===t.type?e=[...CONFIG.stimuli[state.reversedConcept?"female":"male"].map((t=>({t:t,c:state.reversedConcept?"female":"male"}))),...CONFIG.stimuli[state.reversedConcept?"male":"female"].map((t=>({t:t,c:state.reversedConcept?"male":"female"})))]:t.type.includes("combined")&&(e=[...CONFIG.stimuli.male.map((t=>({t:t,c:"male"}))),...CONFIG.stimuli.female.map((t=>({t:t,c:"female"}))),...CONFIG.stimuli.career.map((t=>({t:t,c:"career"}))),...CONFIG.stimuli.family.map((t=>({t:t,c:"family"})))]);const o=[];const n=shuffle(e);let i=0;for(let t=0;t<t.trials;t++)i>=n.length&&(i=0),o.push(n[i++]);t._trials=o,state.trialIndex=0,stimulusEl.textContent="...",setTimeout(nextTrial,500)}
+    function nextTrial(){const t=state.blockQueue[state.blockIndex];if(state.trialIndex>=t._trials.length)return state.blockIndex++,updateProgress(),debugMsg("Next block"),void nextBlock();const e=t._trials[state.trialIndex];state.currentStimulus=e;const o=!!state.leftMapping[e.c],n=!!state.rightMapping[e.c];if(state.expectKey=o?"left":n?"right":null,!state.expectKey)return console.warn("No mapping for stimulus:",e),state.trialIndex++,void nextTrial();stimulusEl.textContent=e.t,errx.classList.remove("show"),state.accepting=!0,state.startTime=now(),updateProgress()}
+    function handleResponse(t){if(state.inErrorState){if(t===state.expectKey){const e=600,o=(now()-state.startTime)+e,n=state.blockQueue[state.blockIndex];logTrial(n,o,1,t),state.inErrorState=!1,state.trialIndex++,nextTrial()}return}if(!state.accepting)return;state.accepting=!1;const e=now()-state.startTime,o=state.blockQueue[state.blockIndex];t===state.expectKey?(logTrial(o,e,0,t),state.trialIndex++,nextTrial()):(showErrorX(),state.inErrorState=!0)}
+    function logTrial(t,e,o,n){const i=e<300||e>1e4?1:0;state.trials.push({ts:Date.now(),block:t.id,blockType:t.type,stimulus:state.currentStimulus.t,category:state.currentStimulus.c,expect:state.expectKey,key:n,correct:o?0:1,error:o,rt:Math.round(e),extreme:i})}
+    async function finishTest(){const t=state.trials.filter((t=>"B-04"===t.block||"B-07"===t.block)).filter((t=>!t.extreme)),e=t.filter((t=>"B-04"===t.block)).map((t=>t.rt)),o=t.filter((t=>"B-07"===t.block)).map((t=>t.rt)),n=mean(e),i=mean(o),s=stdev(e),a=stdev(o),l=Math.sqrt((s**2+a**2)/2)||1,r=(i-n)/l;showResult(r),persistToLocalStorage();if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL !== 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {saveStatus.textContent="Saving results...";const t={createdAt:new Date().toISOString(),demographics:state.demographics,computed:{D:r,mean_compatible:n,mean_incompatible:i,pooled_sd:l},trials:state.trials};try{const e=await fetch(GOOGLE_SCRIPT_URL,{method:"POST",mode:"no-cors",cache:"no-cache",headers:{"Content-Type":"application/json"},body:JSON.stringify(t)});saveStatus.textContent="Anonymous results saved. Thank you!"}catch(t){saveStatus.style.color="var(--error)",saveStatus.textContent="Could not save results online.",console.error("Error saving to Google Sheets:",t)}}}
+    function mean(t){return t.length?t.reduce(((t,e)=>t+e),0)/t.length:0}
+    function stdev(t){if(t.length<2)return 0;const e=mean(t);return Math.sqrt(t.reduce(((o,n)=>o+(n-e)**2),0)/(t.length-1))}
+    function persistToLocalStorage(){try{const t=`ict_gender_trials_${Date.now()}`;localStorage.setItem(t,JSON.stringify({meta:{version:CONFIG.version,lang:CONFIG.language},demographics:state.demographics,benchmark:state.benchmark,trials:state.trials}))}catch(t){console.warn("Could not save raw data to localStorage.")}}
+    function showResult(t){const{mean:e,sd:o,n:i}=state.benchmark,s=[`Your D-Score: <b>${t.toFixed(2)}</b>`,`Population mean: <b>${e.toFixed(2)}</b> (SD = ${o.toFixed(2)}, n = ${i})`,interp(t)].join("<br>");resultSummary.innerHTML=s;const a=pctFromD(t),l=pctFromD(e);userMarker.style.left=a+"%",meanMarker.style.left=l+"%";try{resultModal.showModal()}catch(t){console.error("Result modal could not be shown:",t)}saveStatus.textContent="",saveStatus.style.color="var(--muted)",downloadBtn.onclick=()=>downloadJSON(`ict_gender_raw_${Date.now()}.json`,{demographics:state.demographics,benchmark:state.benchmark,computed:{D:t,GM:e,SD:o,N:i},trials:state.trials})}
+    function pctFromD(t){return(Math.max(-1,Math.min(1,t))+1)/2*100}
+    function interp(t){let e,o;return t>.35?(e="Moderate stereotype",o="Indicates a moderate implicit association of Male with Career and Female with Family."):t>.15?(e="Slight stereotype",o="Indicates a slight implicit association of Male with Career and Female with Family."):t>-.15?(e="Neutral",o="Indicates little to no implicit stereotype."):t>-.35?(e="Slight stereotype (reversed)",o="Indicates a slight implicit association of Female with Career and Male with Family."):(e="Moderate stereotype (reversed)",o="Indicates a moderate implicit association of Female with Career and Male with Family."),`<span style="color:var(--muted)">${e}: ${o}</span>`}
+    function downloadJSON(t,e){const o=new Blob([JSON.stringify(e,null,2)],{type:"application/json"}),n=URL.createObjectURL(o),i=document.createElement("a");i.href=n,i.download=t,i.click(),URL.revokeObjectURL(n)}
+  </script>
+</body>
+</html>
